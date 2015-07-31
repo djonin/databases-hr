@@ -4,7 +4,7 @@ USE chat;
 
 CREATE TABLE messages (
 username VARCHAR(100),
-textMsg VARCHAR(140),
+message VARCHAR(140),
 roomname VARCHAR(100),
 createdAt DATE,
 id int(11) NOT NULL auto_increment,
