@@ -2,6 +2,7 @@
  * for these tests to pass. */
 
 var mysql = require('mysql');
+var _ = require('underscore');
 var request = require("request"); // You might need to npm install the request module!
 var expect = require('../../node_modules/chai/chai').expect;
 
@@ -16,16 +17,23 @@ describe("Persistent Node Chat Server", function() {
     });
     dbConnection.connect();
 
-    var tablename = "messages"; // TODO: fill this out
+    var tablenames = ["messages", "users"];
+    var count = 0;
+    _(tablenames).each(function(tablename) {
+      dbConnection.query("truncate " + tablename, function() {
+        count++;
+        if (count === tablenames.length) {
+          done();
+        }
+      });
+    });
 
-    /* Empty the db table before each test so that multiple tests
-     * (or repeated runs of the tests) won't screw each other up: */
-    dbConnection.query("truncate " + tablename, done);
   });
 
   afterEach(function() {
     dbConnection.end();
   });
+
 
   it("Should insert posted messages to the DB", function(done) {
     // Post the user to the chat server.
@@ -78,11 +86,49 @@ describe("Persistent Node Chat Server", function() {
       // the message we just inserted:
       request("http://127.0.0.1:3000/classes/messages", function(error, response, body) {
         var messageLog = JSON.parse(body);
-        console.log('Message log:', messageLog);
         expect(messageLog[0].message).to.equal("Men like you can never change!");
         expect(messageLog[0].roomname).to.equal("main");
         done();
       });
     });
   });
+
+  it("Should post users to the DB", function(done) {
+    // Post the user to the chat server.
+    request({ method: "POST",
+              uri: "http://127.0.0.1:3000/classes/users",
+              json: { username: "Valjean" }
+    }, function () {
+        var queryString = "SELECT * FROM users";
+        var queryArgs = [];
+
+        dbConnection.query(queryString, queryArgs, function(err, results) {
+          // Should have one result:
+          expect(results.length).to.equal(1);
+
+          // TODO: If you don't have a column named text, change this test.
+          expect(results[0].username).to.equal("Valjean");
+
+          done();
+        });
+      });
+  });
+
+  it("Should output all users from the DB", function(done) {
+    var queryString = "INSERT INTO users SET ?";
+    var settings = {color:'somecolor', font:'somefont'};
+    var queryArgs = {username: "Valjeen", settings: JSON.stringify(settings)};
+
+    dbConnection.query(queryString, queryArgs, function(err) {
+      if (err) { throw err; }
+
+      request("http://127.0.0.1:3000/classes/users", function(error, response, body) {
+        var users = JSON.parse(body);
+        expect(users[0].username).to.equal("Valjeen");
+        expect(users[0].settings).to.equal(JSON.stringify(settings));
+        done();
+      });
+    });
+  });
 });
+
